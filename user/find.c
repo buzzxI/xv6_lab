@@ -2,13 +2,13 @@
 #include "kernel/stat.h"
 #include "user/user.h"
 #include "kernel/fs.h"
+#include "kernel/param.h"
 
 #define stderr 2
 #define stdout 1
-#define MAXBUF 512
+#define MAXBUF 512 
 
-
-void find_routine(char* path, char* pattern);
+char* find_routine(char* path, char* pattern, char* rst);
 void last_name(char* full_path, char* rst);
 
 int main(int argc, char** argv) {
@@ -16,26 +16,26 @@ int main(int argc, char** argv) {
         fprintf(stderr, "Usage: %s <path> <pattern>\n", argv[0]);
         exit(1);
     }
-    find_routine(argv[1], argv[2]);
+    char rst[MAXBUF];
+    find_routine(argv[1], argv[2], rst);
+    fprintf(stdout, "%s", rst);
     exit(0);
 }
 
-void find_routine(char* path, char* pattern) {
-
-    char buffer[MAXBUF], *p;
+char* find_routine(char* path, char* pattern, char* rst) {
+    char buffer[MAXPATH], *p;
     int fd;
     struct dirent de;
     struct stat st;
-    // fprintf(stdout, "path: %s\n", path);
     if ((fd = open(path, 0)) < 0) {
         fprintf(stderr, "find: cannot open:%s\n", path);
-        return;
+        return rst;
     }
 
     if (fstat(fd, &st) < 0) {
         fprintf(stderr, "find: cannot stat %s\n", path);
         close(fd);
-        return;
+        return rst;
     }
     
     switch (st.type)
@@ -44,9 +44,21 @@ void find_routine(char* path, char* pattern) {
     case T_FILE:
         last_name(path, buffer);
         if (strlen(buffer) == 0) {
-            if (strcmp(path, pattern) == 0) fprintf(stdout, "%s\n", path);
+            if (strcmp(path, pattern) == 0) {
+                strcpy(rst, path);
+                rst += strlen(path);
+                *rst = '\n';
+                rst++;
+                // fprintf(stdout, "%s\n", path);
+            }
         } else {
-            if (strcmp(buffer, pattern) == 0) fprintf(stdout, "%s\n", path);
+            if (strcmp(buffer, pattern) == 0) {
+                strcpy(rst, path);
+                rst += strlen(path);
+                *rst = '\n';
+                rst++;
+                // fprintf(stdout, "%s\n", path);
+            }
         }
         break;
     case T_DIR:
@@ -59,11 +71,12 @@ void find_routine(char* path, char* pattern) {
         while ((read(fd, &de, sizeof(de))) == sizeof(de)) {
             if (de.inum == 0) continue;
             strcpy(p, de.name);
-            find_routine(buffer, pattern);
+            rst = find_routine(buffer, pattern, rst);
         }
         break;
     }
     close(fd);
+    return rst;
 }
 
 // get file last name
