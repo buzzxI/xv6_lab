@@ -312,6 +312,9 @@ fork(void)
 
   pid = np->pid;
 
+  // copy parent strace mask to child process
+  np->strace_mask = p->strace_mask;
+
   release(&np->lock);
 
   acquire(&wait_lock);
