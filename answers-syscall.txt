@@ -1,0 +1,15 @@
+# Using gdb
+
+1. syscall() is called by usertrap()
+2. the value of p->trapframe->a7 contains a number about syscall, specifically, in this case the value is 7, which means SYS_exec
+3. previous mode is user mode
+4. the assembly code is:
+
+``` assembly
+lw	s2,0(zero)
+```
+
+num is bind to register s2
+
+5. the kernel crash for illegal memory access, the code try to load value from address 0
+6. the name of process is `initcode`, it's pid is 1
