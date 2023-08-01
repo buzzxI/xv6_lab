@@ -89,6 +89,16 @@ myproc(void)
   return p;
 }
 
+// Return process count
+uint64 process_count() {
+  uint64 rst = 0;
+  struct proc* p = proc;
+  for (; p < &proc[NPROC]; p++) {
+    if (p && p->state != UNUSED) rst++;
+  }
+  return rst;
+}
+
 int
 allocpid()
 {
