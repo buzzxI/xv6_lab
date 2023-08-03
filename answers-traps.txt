@@ -1,0 +1,8 @@
+# solutions
+
+1. register a0 is used to pass param, register a2 holds 13
+2. there is no call to function to f, the call to function to g has been inlined, function f just add 3 to a0
+3. printf located at 0x64a
+4. ra is 0x30
+5. it prints HE110 World, if risc-v is big-endian, i should be 0x726c6400, number 57616 need not be changed
+6. ???
