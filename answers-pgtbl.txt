@@ -1,0 +1,12 @@
+# answers
+
+1. fstat/stat, it read file info, file into can be copied into USYSCALL, user use syscall update file, can update USYSCALL at the same time
+2. the layout of user virtual space begins with zero:
+  * text
+  * data/bss(initialized data)
+  * stack(with guard page)
+  * head(not used by default)
+  * trapframe
+  * trampoline
+  page 0 contains text, page 1 contains data, page 2 is gurad page, page 3 is user stack
+  page 511 is trampoline, page 509 and page 510 is trapframe

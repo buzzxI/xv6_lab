@@ -437,3 +437,49 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
     return -1;
   }
 }
+
+static void vmprint_recursive(pagetable_t pagetable, char* prefix) {
+  char buffer[16];
+  char *p = buffer;
+  for (; *prefix != 0; prefix++, p++) *p = *prefix;
+  *p++ = ' ';
+  *p++ = '.';
+  *p++ = '.';
+  *p = 0;
+  
+  for (int i = 0; i < 512; i++) {
+    pte_t pte = pagetable[i];
+    if ((pte & PTE_V)) {
+      pagetable_t pa = (pagetable_t)PTE2PA(pte); 
+      printf("%s%d: pte %p pa %p\n", buffer, i, pte, pa);
+      // PTE to next level pagetable
+      if ((pte & (PTE_R | PTE_W | PTE_X)) == 0) vmprint_recursive(pa, buffer);
+    }
+  }
+}
+
+// ugly but brutal
+// static void vmprint_iterative(pagetable_t pagetable) {
+//   for (int i = 0; i < 512; i++) {
+//     pte_t l0_pte = pagetable[i];
+//     if ((l0_pte & PTE_V)) {
+//       printf("..%d: pte %x pa %x\n", i, l0_pte, PTE2PA(l0_pte));
+//       for (int j = 0; j < 512; j++) {
+//         pte_t l1_pte = ((pagetable_t)l0_pte)[j];
+//         if ((l1_pte & PTE_V)) {
+//           printf(" .. ..%d: pte %x pa %x\n", j, l1_pte, PTE2PA(l1_pte));
+//           for (int k = 0; k < 512; k++) {
+//             pte_t l2_pte = ((pagetable_t)l1_pte)[k];
+//             if ((l2_pte & PTE_V)) printf(" .. .. ..%d: pte %x pa %x\n", k, l2_pte, PTE2PA(l2_pte));
+//           }
+//         }
+//       }
+//     }
+//   }
+// }
+
+void vmprint(pagetable_t pagetable) {
+  printf("page table %p\n", pagetable);
+  char prefix = 0;
+  vmprint_recursive(pagetable, &prefix);
+}
