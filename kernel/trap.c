@@ -67,6 +67,21 @@ usertrap(void)
     syscall();
   } else if((which_dev = devintr()) != 0){
     // ok
+    // handle timer interrupt
+    if (which_dev == 2) {
+      if (p->uhandler.valid == 1) {
+        p->uhandler.passed_ticks++;
+        // user-level handler need to be called
+        if (p->uhandler.passed_ticks == p->uhandler.ticks) {
+          memmove(p->uhandler.frame_cache, p->trapframe, sizeof(struct trapframe)); 
+          p->trapframe->epc = p->uhandler.handler;
+          // clear passed ticks
+          p->uhandler.passed_ticks = 0;
+          // validation sign will be set after sigreturn
+          p->uhandler.valid = 2;
+        }
+      }
+    }
   } else {
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
     printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());

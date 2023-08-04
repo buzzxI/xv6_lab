@@ -146,6 +146,9 @@ found:
   p->context.ra = (uint64)forkret;
   p->context.sp = p->kstack + PGSIZE;
 
+  // no user-level handler by default
+  p->uhandler.valid = 0;
+  
   return p;
 }
 

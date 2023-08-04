@@ -79,6 +79,14 @@ struct trapframe {
   /* 280 */ uint64 t6;
 };
 
+struct uhandler {
+  uint8 valid;                    // Is current handler valid: 0 for invalid, 1 for valid, 2 for not return yet
+  uint64 handler;                 // User handler function
+  uint64 ticks;                   // Ticks for handler
+  uint64 passed_ticks;            // Ticks passed since handler is installed or called last time
+  struct trapframe* frame_cache;  // cache trapframe for resume orginal process
+};
+
 enum procstate { UNUSED, USED, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
 
 // Per-process state
@@ -104,4 +112,5 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
+  struct uhandler uhandler;    // User-level handler
 };

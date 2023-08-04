@@ -118,11 +118,11 @@ printf(char *fmt, ...)
 void
 panic(char *s)
 {
+  backtrace();
   pr.locking = 0;
   printf("panic: ");
   printf(s);
   printf("\n");
-  backtrace();
   panicked = 1; // freeze uart output from other CPUs
   for(;;)
     ;

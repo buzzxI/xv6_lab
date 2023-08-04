@@ -92,3 +92,51 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+// install user-level handler
+// this function will always returns 0;
+uint64 sys_sigalarm(void) {
+  
+  struct proc* p = myproc();
+
+  // user handler is processing, no installaion allowed
+  if (p->uhandler.valid == 2) return 1; 
+
+  int ticks;
+  uint64 handler;
+
+  argint(0, &ticks);
+  argaddr(1, &handler);
+
+  
+  if (ticks == 0) {
+    p->uhandler.valid = 0;
+    if (p->uhandler.frame_cache) {
+      kfree(p->uhandler.frame_cache);
+      p->uhandler.frame_cache = 0;
+    }
+    return 0;
+  }
+
+  p->uhandler.valid = 1;
+  p->uhandler.ticks = ticks;
+  p->uhandler.passed_ticks = 0;
+  p->uhandler.handler = handler;
+  if (!p->uhandler.frame_cache) {
+    if ((p->uhandler.frame_cache = (struct trapframe*)kalloc()) == 0) {
+      printf("scause %p\n", r_scause());
+      printf("sepc=%p stval=%p\n", r_sepc(), r_stval());
+      panic("sys_sigalarm:no:room:for:trapframe:cache");
+    }
+  }
+  return 0;
+}
+
+// restore trapframe for user
+uint64 sys_sigreturn() {
+  struct proc* p = myproc();
+  p->uhandler.valid = 1;
+  memmove(p->trapframe, p->uhandler.frame_cache, sizeof(struct trapframe));
+  return p->trapframe->a0;
+}
+
