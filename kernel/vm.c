@@ -338,10 +338,12 @@ int uvmcopy(pagetable_t old, pagetable_t new, uint64 sz) {
   for (uint64 va = 0; va < sz; va += PGSIZE) {
     if ((pte = walk(old, va, 0)) == 0) panic("uvmcopy: pte should exist");
     if ((*pte & PTE_V) == 0) panic("uvmcopy: page not present");
+    uint64 pa = PTE2PA(*pte);
+    if (kinc(pa) < 0) panic("uvmcopy:refcount:negative");
     if (*pte & PTE_W) *pte |= PTE_EN_W;
     // each page will not be writeable after fork
     *pte = (*pte & (~PTE_W));
-    if (mappages(new, va, PGSIZE, PTE2PA(*pte), PTE_FLAGS(*pte)) != 0) panic("uvmcopy:page:mapping:fault");
+    if (mappages(new, va, PGSIZE, pa, PTE_FLAGS(*pte)) != 0) panic("uvmcopy:page:mapping:fault");
   }
   return 0;
 }
@@ -366,12 +368,27 @@ int
 copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
 {
   uint64 n, va0, pa0;
+  pte_t* pte;
 
   while(len > 0){
     va0 = PGROUNDDOWN(dstva);
-    pa0 = walkaddr(pagetable, va0);
-    if(pa0 == 0)
-      return -1;
+    if (va0 >= MAXVA || (pte = walk(pagetable, va0, 0)) == 0) return -1;
+    if ((*pte & PTE_U) == 0) return -1;
+    if ((*pte & PTE_W) == 0 && (*pte & PTE_EN_W) == 0) panic("copyout:write:to:nonwritable:page");
+    pa0 = PTE2PA(*pte);
+    
+    // simulate page fault exception
+    if ((*pte & PTE_EN_W)) {
+      char* mem;
+      if ((mem = (char*)kalloc()) == 0) return -1;
+      uint flag = PTE_FLAGS(*pte);
+      flag |= PTE_W;
+      memmove(mem, (char*)pa0, PGSIZE);      
+      kfree((char*)pa0);
+      *pte = PA2PTE(mem) | flag;
+      pa0 = (uint64)mem;
+    }
+
     n = PGSIZE - (dstva - va0);
     if(n > len)
       n = len;
@@ -450,4 +467,30 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
   } else {
     return -1;
   }
+}
+
+static void vmprint_recursive(pagetable_t pagetable, char* prefix) {
+  char buffer[16];
+  char *p = buffer;
+  for (; *prefix != 0; prefix++, p++) *p = *prefix;
+  *p++ = ' ';
+  *p++ = '.';
+  *p++ = '.';
+  *p = 0;
+  
+  for (int i = 0; i < 512; i++) {
+    pte_t pte = pagetable[i];
+    if ((pte & PTE_V)) {
+      pagetable_t pa = (pagetable_t)PTE2PA(pte); 
+      printf("%s%d: pte %p pa %p\n", buffer, i, pte, pa);
+      // PTE to next level pagetable
+      if ((pte & (PTE_R | PTE_W | PTE_X)) == 0) vmprint_recursive(pa, buffer);
+    }
+  }
+}
+
+void vmprint(pagetable_t pagetable) {
+  printf("page table %p\n", pagetable);
+  char prefix = 0;
+  vmprint_recursive(pagetable, &prefix);
 }

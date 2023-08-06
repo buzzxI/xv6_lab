@@ -3050,6 +3050,8 @@ drivetests(int quick, int continuous, char *justone) {
     printf("usertests starting\n");
     int free0 = countfree();
     int free1 = 0;
+    // int free1 = countfree();
+    // printf("first:%d:second:%d\n", free0, free1);
     if (runtests(quicktests, justone)) {
       if(continuous != 2) {
         return 1;
@@ -3065,11 +3067,12 @@ drivetests(int quick, int continuous, char *justone) {
       }
     }
     if((free1 = countfree()) < free0) {
-      printf("FAILED -- lost some free pages %d (out of %d)\n", free1, free0);
+      printf("FAILED -- lost some free pages %d (out of %d)\n", free, free0);
       if(continuous != 2) {
         return 1;
       }
     }
+    printf("before:%d:after:%d\n", free0, free1);
   } while(continuous);
   return 0;
 }

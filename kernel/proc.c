@@ -310,6 +310,11 @@ fork(void)
 
   safestrcpy(np->name, p->name, sizeof(p->name));
 
+  // printf("pid:%d:pagetable\n", p->pid);
+  // vmprint(p->pagetable);
+  // printf("pid:%d:pagetable\n", np->pid);
+  // vmprint(np->pagetable);
+
   pid = np->pid;
 
   release(&np->lock);

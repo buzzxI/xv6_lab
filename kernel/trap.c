@@ -29,6 +29,13 @@ trapinithart(void)
   w_stvec((uint64)kernelvec);
 }
 
+// general handler for fatal exception in usertrap
+static void usertrap_exception_handler(struct proc* p) {
+  printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
+  printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
+  setkilled(p);
+}
+
 //
 // handle an interrupt, exception, or system call from user space.
 // called from trampoline.S
@@ -49,8 +56,10 @@ usertrap(void)
   
   // save user program counter.
   p->trapframe->epc = r_sepc();
+
+  uint64 scause = r_scause();
   
-  if(r_scause() == 8){
+  if(scause == 8){
     // system call
 
     if(killed(p))
@@ -65,13 +74,24 @@ usertrap(void)
     intr_on();
 
     syscall();
+  } else if (scause == 15) {
+    // store page fault
+    uint64 addr = r_stval();
+    pte_t* pte;
+    char* mem;
+    if ((addr < MAXVA) && (pte = walk(p->pagetable, addr, 0)) != 0 && (*pte & PTE_EN_W) && (mem = (char*)kalloc()) != 0) {
+      // orignal page is writeable, kalloc will allocate a new page for current page
+      uint64 pa = PTE2PA(*pte);
+      uint flag = PTE_FLAGS(*pte);
+      flag |= PTE_W;
+      memmove(mem, (char*)pa, PGSIZE);
+      kfree((char*)pa);
+      *pte = PA2PTE(mem) | flag; 
+    } else usertrap_exception_handler(p);
+
   } else if((which_dev = devintr()) != 0){
     // ok
-  } else {
-    printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
-    printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
-    setkilled(p);
-  }
+  } else usertrap_exception_handler(p);
 
   if(killed(p))
     exit(-1);
