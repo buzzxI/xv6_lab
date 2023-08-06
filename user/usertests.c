@@ -3050,8 +3050,6 @@ drivetests(int quick, int continuous, char *justone) {
     printf("usertests starting\n");
     int free0 = countfree();
     int free1 = 0;
-    // int free1 = countfree();
-    // printf("first:%d:second:%d\n", free0, free1);
     if (runtests(quicktests, justone)) {
       if(continuous != 2) {
         return 1;

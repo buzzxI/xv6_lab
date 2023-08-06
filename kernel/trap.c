@@ -84,6 +84,7 @@ usertrap(void)
       uint64 pa = PTE2PA(*pte);
       uint flag = PTE_FLAGS(*pte);
       flag |= PTE_W;
+      flag &= (~PTE_EN_W);
       memmove(mem, (char*)pa, PGSIZE);
       kfree((char*)pa);
       *pte = PA2PTE(mem) | flag; 

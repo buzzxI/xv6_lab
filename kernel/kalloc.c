@@ -108,8 +108,6 @@ kalloc(void)
     memset((char*)r, 5, PGSIZE); // fill with junk
     kmem.free_pages--;
     if (kmem.free_pages == (uint64)-1) panic("kalloc:free:page:negative"); 
-  } else {
-    printf("kalloc:run:out:of:memory\n")
   }
 
   release(&kmem.lock);

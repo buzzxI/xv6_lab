@@ -383,6 +383,7 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
       if ((mem = (char*)kalloc()) == 0) return -1;
       uint flag = PTE_FLAGS(*pte);
       flag |= PTE_W;
+      flag &= (~PTE_EN_W);
       memmove(mem, (char*)pa0, PGSIZE);      
       kfree((char*)pa0);
       *pte = PA2PTE(mem) | flag;
