@@ -10,18 +10,42 @@
 #define STACK_SIZE  8192
 #define MAX_THREAD  4
 
+struct context {
+  uint64 ra;
+  uint64 sp;
+
+  // callee-saved
+  uint64 s0;
+  uint64 s1;
+  uint64 s2;
+  uint64 s3;
+  uint64 s4;
+  uint64 s5;
+  uint64 s6;
+  uint64 s7;
+  uint64 s8;
+  uint64 s9;
+  uint64 s10;
+  uint64 s11;
+};
 
 struct thread {
   char       stack[STACK_SIZE]; /* the thread's stack */
   int        state;             /* FREE, RUNNING, RUNNABLE */
+  struct context context;       /* thread context */
+  int         tid;              /* thread id*/
 };
-struct thread all_thread[MAX_THREAD];
+static struct thread all_thread[MAX_THREAD];
 struct thread *current_thread;
 extern void thread_switch(uint64, uint64);
               
 void 
 thread_init(void)
 {
+  for (int i = 0; i < MAX_THREAD; i++) {
+    all_thread[i].tid = i;
+    all_thread[i].context.sp = (uint64)all_thread[i].stack + STACK_SIZE;
+  }
   // main() is thread 0, which will make the first invocation to
   // thread_schedule().  it needs a stack so that the first thread_switch() can
   // save thread 0's state.  thread_schedule() won't run the main thread ever
@@ -62,8 +86,8 @@ thread_schedule(void)
      * Invoke thread_switch to switch from t to next_thread:
      * thread_switch(??, ??);
      */
-  } else
-    next_thread = 0;
+    thread_switch((uint64)(&t->context), (uint64)(&next_thread->context));
+  } else next_thread = 0;
 }
 
 void 
@@ -76,6 +100,8 @@ thread_create(void (*func)())
   }
   t->state = RUNNABLE;
   // YOUR CODE HERE
+  t->context.sp = (uint64)t->stack + STACK_SIZE;
+  t->context.ra = (uint64)func;
 }
 
 void 
