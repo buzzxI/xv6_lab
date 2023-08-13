@@ -131,16 +131,17 @@ bget(uint dev, uint blockno)
           b->blockno = blockno;
           b->valid = 0;
           b->refcnt = 1;
-          release(&bcache.buckets[i].lock);
           release(&bcache.buckets[idx].lock);
-          break;
+          release(&bcache.buckets[i].lock);
+          release(&bcache.lock);
+          acquiresleep(&b->lock);
+          return b;
       }
     }
+    release(&bcache.buckets[i].lock);
   }
 
-  release(&bcache.lock);
-  if (b) acquiresleep(&b->lock);
-  else panic("bget: no buffers");
+  panic("bget: no buffers");
   return b;
 }
 
