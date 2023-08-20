@@ -335,6 +335,26 @@ sys_open(void)
     }
   }
 
+  // added for lab: fs
+  if (ip->type == T_SYMLINK && omode != O_NOFOLLOW) {
+    char child_path[MAXPATH];
+    for (int round = 0; ip->type == T_SYMLINK; round++) {
+      if (round == 10) {
+        iunlockput(ip);
+        end_op();
+        return -1;
+      }
+      int i = 0, r;
+      while ((r = readi(ip, 0, (uint64)child_path + i, i, MAXPATH)) > 0) i += r;
+      iunlockput(ip);
+      if ((ip = namei(child_path)) == 0) {
+        end_op();
+        return -1;
+      }
+      ilock(ip);
+    }
+  }
+
   if(ip->type == T_DEVICE && (ip->major < 0 || ip->major >= NDEV)){
     iunlockput(ip);
     end_op();
@@ -501,5 +521,32 @@ sys_pipe(void)
     fileclose(wf);
     return -1;
   }
+  return 0;
+}
+
+// added for lab: fs
+uint64 sys_symlink(void) {
+  char target[MAXPATH], path[MAXPATH];
+  int target_len;
+  
+  if ((target_len = argstr(0, target, MAXPATH)) < 0 || argstr(1, path, MAXPATH) < 0) return -1;
+
+  struct inode *ip;
+
+  begin_op();
+  // this function will add an entry to parent directory
+  if ((ip = create(path, T_SYMLINK, 0, 0)) == 0) {
+    end_op();
+    return -1;
+  }
+  
+  int i = 0, r;
+  while (i < target_len) {
+    int n1 = target_len - i;
+    if ((r = writei(ip, 0,  (uint64)target + i, i, n1)) > 0) i += r;
+  }
+
+  iunlockput(ip);  
+  end_op();
   return 0;
 }
