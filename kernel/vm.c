@@ -437,3 +437,31 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
     return -1;
   }
 }
+
+// added for lab: mmap(debug)
+static void page_print_recursive(pagetable_t pagetable, char* prefix) {
+  char next_prefix[16];
+  char* p = prefix;
+  int i = 0;
+  for (; i < 16 && *p != 0; i++, p++) next_prefix[i] = *p;
+  next_prefix[i++] = ' ';
+  next_prefix[i++] = '.';
+  next_prefix[i++] = '.';
+  next_prefix[i] = 0;
+
+  for (int i = 0; i < 512; i++) {
+    pte_t pte = pagetable[i];
+    if ((pte & PTE_V)) {
+      uint64 pa = PTE2PA(pte);
+      printf("%s%d: pte %p pa %p\n", prefix, i, pte, pa);
+      // current pte points to next level page table
+      if ((pte & (PTE_R | PTE_W | PTE_X)) == 0) page_print_recursive((pagetable_t)pa, next_prefix);
+    }
+  }
+}
+
+void vmprint(pagetable_t pagetable) {
+  printf("page table %p\n", pagetable);
+  char prefix[] = "..";
+  page_print_recursive(pagetable, prefix);
+}

@@ -305,6 +305,16 @@ r_tp()
   return x;
 }
 
+// added for lab: mmap(debug)
+// read frame pointer
+static inline uint64
+r_fp()
+{
+  uint64 x;
+  asm volatile("mv %0, s0" : "=r" (x) );
+  return x;
+}
+
 static inline void 
 w_tp(uint64 x)
 {
@@ -343,6 +353,8 @@ typedef uint64 *pagetable_t; // 512 PTEs
 #define PTE_W (1L << 2)
 #define PTE_X (1L << 3)
 #define PTE_U (1L << 4) // user can access
+// added for lab: mmap
+#define PTE_D (1L << 7) // dirty bits
 
 // shift a physical address to the right place for a PTE.
 #define PA2PTE(pa) ((((uint64)pa) >> 12) << 10)

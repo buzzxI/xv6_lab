@@ -5,6 +5,8 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
+// added for lab: mmap
+#include "fcntl.h"
 
 struct cpu cpus[NCPU];
 
@@ -145,6 +147,9 @@ found:
   memset(&p->context, 0, sizeof(p->context));
   p->context.ra = (uint64)forkret;
   p->context.sp = p->kstack + PGSIZE;
+
+  // added for lab: mmap
+  for (int i = 0; i < NVMA; i++) p->vmas[i].valid = 0;
 
   return p;
 }
@@ -288,12 +293,38 @@ fork(void)
     return -1;
   }
 
-  // Copy user memory from parent to child.
-  if(uvmcopy(p->pagetable, np->pagetable, p->sz) < 0){
-    freeproc(np);
-    release(&np->lock);
-    return -1;
+  // added for lab: mmap
+  for (int i = 0; i < NVMA; i++) {
+    if (!p->vmas[i].valid) continue;
+    struct vma *new_vma = &np->vmas[i];
+    struct vma *old_vma = &p->vmas[i];
+    new_vma->valid = 1;
+    new_vma->file_target = old_vma->file_target;
+    new_vma->start = old_vma->start;
+    new_vma->file_start = old_vma->file_start;
+    new_vma->length = old_vma->length;
+    new_vma->prot = old_vma->prot;
+    new_vma->flags = old_vma->flags;
+    filedup(new_vma->file_target);
   }
+
+  // Copy user memory from parent to child.
+  uint64 pa, addr;
+  uint flags;
+  char *mem;
+  for (addr = 0; addr < p->sz; addr += PGSIZE) {
+    pte_t *pte = walk(p->pagetable, addr, 0);
+    if (*pte == 0) continue;
+    pa = PTE2PA(*pte);
+    flags = PTE_FLAGS(*pte);
+    if ((mem = kalloc()) == 0) goto copy_err;
+    memmove(mem, (char*)pa, PGSIZE);
+    if (mappages(np->pagetable, addr, PGSIZE, (uint64)mem, flags) != 0) {
+      kfree(mem);
+      goto copy_err;
+    }
+  }
+
   np->sz = p->sz;
 
   // copy saved user registers.
@@ -323,6 +354,13 @@ fork(void)
   release(&np->lock);
 
   return pid;
+
+  copy_err:
+    uvmunmap(np->pagetable, 0, addr / PGSIZE, 1);
+    freeproc(np);
+    release(&np->lock);
+    return -1;
+
 }
 
 // Pass p's abandoned children to init.
@@ -350,6 +388,12 @@ exit(int status)
 
   if(p == initproc)
     panic("init exiting");
+
+  // added for lab: mmap
+  // before process terminates, all areas need to be released
+  for (int i = 0; i < NVMA; i++) {
+    if (p->vmas[i].valid) munmmap(p->vmas[i].start, p->vmas[i].length, &p->vmas[i], p->pagetable);
+  }
 
   // Close all open files.
   for(int fd = 0; fd < NOFILE; fd++){
@@ -679,5 +723,30 @@ procdump(void)
       state = "???";
     printf("%d %s %s", p->pid, state, p->name);
     printf("\n");
+  }
+}
+
+// added for lab: mmap
+void munmmap(uint64 addr, int length, struct vma *vma, pagetable_t pagetable) {
+  uint64 end = addr + length;
+  for (uint64 cur = addr; cur < end; cur += PGSIZE) {
+    pte_t *pte = walk(pagetable, cur, 0);
+    // current page may has not been mapped
+    if (*pte == 0) continue; 
+    // if current vma need to write back, check dirty bit
+    if (vma->flags == MAP_SHARED) {
+      // current page is dirty
+      if (*pte & PTE_D) store_vma(vma, cur, length);
+    }
+    uvmunmap(pagetable, cur, 1, 1);
+  }
+
+  // store memory modification into file
+  // src is virtual address
+  if (vma->start == addr) vma->start += length;
+  vma->length -= length;
+  if (vma->length == 0) {
+    fileclose(vma->file_target);
+    vma->valid = 0;
   }
 }

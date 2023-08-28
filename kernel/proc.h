@@ -81,6 +81,18 @@ struct trapframe {
 
 enum procstate { UNUSED, USED, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
 
+// added for lab: mmap
+// virtual memory area 
+struct vma {
+  int valid;                  // is current vma has been used
+  uint64 start;               // start address of specific area
+  uint64 file_start;          // generally start equals to file_start, however when user process release some page from start, start will move forward, file_start remains
+  uint64 length;              // area size
+  int prot;                   // area access permission
+  struct file *file_target;   // area can be mapped into specific file
+  int flags;                  // flags control whether to synchronize area modification to file
+};
+
 // Per-process state
 struct proc {
   struct spinlock lock;
@@ -104,4 +116,7 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
+
+  // added for lab: mmap
+  struct vma vmas[NVMA];
 };

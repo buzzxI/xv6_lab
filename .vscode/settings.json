@@ -1,0 +1,7 @@
+{
+    "files.associations": {
+        "defs.h": "c",
+        "file.h": "c",
+        "fcntl.h": "c"
+    }
+}

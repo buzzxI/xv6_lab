@@ -22,6 +22,12 @@ int getpid(void);
 char* sbrk(int);
 int sleep(int);
 int uptime(void);
+// added for lab: mmap
+// void *mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset);
+// size_t and off_t are 8 Bytes long in linux, but they are 4 Bytes (int) for now
+void *mmap(void *, int, int, int, int, int);
+// int munmap(void *addr, size_t length);
+int munmap(void *, int);
 
 // ulib.c
 int stat(const char*, struct stat*);

@@ -1,5 +1,7 @@
 #define NPROC        64  // maximum number of processes
 #define NCPU          8  // maximum number of CPUs
+// added for lab: mmap
+#define NVMA         16  // maximum number of virtual memory area
 #define NOFILE       16  // open files per process
 #define NFILE       100  // open files per system
 #define NINODE       50  // maximum number of active i-nodes

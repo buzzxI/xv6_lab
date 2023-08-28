@@ -180,3 +180,44 @@ filewrite(struct file *f, uint64 addr, int n)
   return ret;
 }
 
+// added for lab: mmap
+// load file into memory, one PAGE a time, until EOF
+int load_vma(struct vma *vma, uint64 dest) {
+  struct file *f = vma->file_target;
+  int size = 0;
+  int length = PGSIZE;
+  int r;
+  ilock(f->ip);
+  while (size < PGSIZE) {
+    r = readi(f->ip, 1, dest, dest - vma->file_start, length);
+    if (r < 0) return r;
+    if (r == 0) break;
+    size += r;
+    length -= r;
+  }
+  iunlock(f->ip);
+  return size;
+}
+
+// added for lab: mmap
+// returns -1 on error, returns 0 on success
+int store_vma(struct vma *vma, uint64 src, int n) {
+  struct file *f = vma->file_target;
+  int max = ((MAXOPBLOCKS - 1 - 1 - 2) / 2) * BSIZE;
+  int i = 0;
+  int r;
+  uint offset = src - vma->file_start;
+  while (i < n) {
+    int n1 = n - i;
+    if (n1 > max) n1 = max;
+    begin_op();
+    ilock(f->ip);
+    if ((r = writei(f->ip, 1, src + i, offset, n1)) > 0) offset += r; 
+    iunlock(f->ip);
+    end_op();
+    if (r != n1) return -1;
+    i += r;
+  }
+  return 0;
+}
+

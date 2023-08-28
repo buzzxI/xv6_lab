@@ -5,6 +5,8 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
+// added for lab: mmap
+#include "fcntl.h"
 
 struct spinlock tickslock;
 uint ticks;
@@ -29,6 +31,60 @@ trapinithart(void)
   w_stvec((uint64)kernelvec);
 }
 
+// added for lab: mmap
+// usertrap rise an exception, then current process will be killed
+static void usertrap_exception_handler(struct proc *p) {
+  printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
+  printf("            sepc=%p stval=%p\n", p->trapframe->epc, r_stval());
+  setkilled(p);
+}
+
+static void load_page_fault_handler(struct proc *p) {
+  uint64 addr = r_stval();
+  // load page fault handler (added for lab: mmap)
+  // if current address is in mmap region, then allocate a new physical page
+  int idx;
+  for (idx = 0; idx < NVMA; idx++) {
+    if (p->vmas[idx].valid == 0) continue;
+    uint64 start = p->vmas[idx].start;
+    uint64 end = start + p->vmas[idx].length;
+    if (addr >= start && addr < end) break;
+  }
+
+  if (idx == NVMA) {
+    // va is not in vma
+    usertrap_exception_handler(p);
+    return;
+  }
+
+  uint64 pa;
+  if ((pa = (uint64)kalloc()) == 0) {
+    // run out of memory
+    usertrap_exception_handler(p);
+    return;
+  }
+
+  // fill the page with empty bytes
+  memset((char*)pa, 0, PGSIZE);
+  // construct permission bits   
+  struct vma *vma = &p->vmas[idx];
+  int perm = PTE_U;
+  if (vma->prot & PROT_READ) perm |= PTE_R;
+  if (vma->prot & PROT_WRITE) perm |= PTE_W;
+  if (vma->prot & PROT_EXEC) perm |= PTE_X;
+
+  int page_cnt = (addr - vma->file_start) / PGSIZE;
+  addr = vma->file_start + page_cnt * PGSIZE;
+  // mapping page
+  if (mappages(p->pagetable, addr, PGSIZE, pa, perm) < 0) {
+    usertrap_exception_handler(p);
+    return;
+  }
+  // load file into physical memory
+  load_vma(vma, addr);
+}
+
+
 //
 // handle an interrupt, exception, or system call from user space.
 // called from trampoline.S
@@ -49,8 +105,10 @@ usertrap(void)
   
   // save user program counter.
   p->trapframe->epc = r_sepc();
+
+  uint64 scause = r_scause();
   
-  if(r_scause() == 8){
+  if(scause == 8){
     // system call
 
     if(killed(p))
@@ -65,13 +123,10 @@ usertrap(void)
     intr_on();
 
     syscall();
-  } else if((which_dev = devintr()) != 0){
+  } else if (scause == 13) load_page_fault_handler(p); 
+  else if((which_dev = devintr()) != 0){
     // ok
-  } else {
-    printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
-    printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
-    setkilled(p);
-  }
+  } else usertrap_exception_handler(p);
 
   if(killed(p))
     exit(-1);
